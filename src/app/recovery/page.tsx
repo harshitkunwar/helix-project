@@ -1,0 +1,33 @@
+﻿"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+
+type Brief = { generatedAt:string; projectDirectory:string; summary:{project:string;branch:string;changedItems:number;recentCommitCount:number;gitAvailable:boolean}; verifiedEvidence:string[]; changedFiles:string[]; recentCommits:string[]; diffStat:string; readme:string; package:Record<string,unknown>; blockers:string[]; assumptions:string[]; recommendedNextActions:string[]; safety:string };
+
+export default function RecoveryPage() {
+  const [directory, setDirectory] = useState("");
+  const [brief, setBrief] = useState<Brief|null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [approved, setApproved] = useState(false);
+  const [copied, setCopied] = useState(false);
+  async function inspect() {
+    setLoading(true); setError(""); setApproved(false);
+    try { const response=await fetch(`/api/recovery/brief?directory=${encodeURIComponent(directory)}`,{cache:"no-store"}); const body=await response.json(); if(!response.ok) throw new Error(body.error); setBrief(body); }
+    catch(e){setError(e instanceof Error?e.message:"Inspection failed");} finally{setLoading(false);}
+  }
+  const handoff=brief?`HELIX PROJECT HANDOFF\nProject: ${brief.summary.project}\nDirectory: ${brief.projectDirectory}\nBranch: ${brief.summary.branch}\nWorking tree entries: ${brief.summary.changedItems}\nRecent commits:\n${brief.recentCommits.map(x=>`- ${x}`).join("\n")}\nDiff: ${brief.diffStat}\nBlockers: ${brief.blockers.join("; ")||"None detected"}\nAssumptions: ${brief.assumptions.join("; ")||"None recorded"}\nApproval: Ask the human in Switch before any file modification. No changes are approved by this report.`:"";
+  async function copyHandoff(){await navigator.clipboard.writeText(handoff);setCopied(true);}
+  return <main className="min-h-screen bg-[#080b10] text-white p-5 md:p-10"><div className="max-w-5xl mx-auto">
+    <Link href="/" className="text-sm text-violet-400">â† Dashboard</Link><div className="mt-7"><p className="text-violet-400 text-xs tracking-widest">HELIX / RECOVERY WORKSPACE</p><h1 className="text-3xl md:text-4xl font-bold mt-3">Project recovery & handoff</h1><p className="text-gray-400 mt-2">Inspect local evidence, then bring the next decision to Switch.</p></div>
+    <section className="bg-[#10151e] border border-white/10 rounded-2xl p-5 mt-7"><label htmlFor="directory" className="block text-sm font-medium">Local project directory</label><div className="flex flex-col sm:flex-row gap-3 mt-3"><input id="directory" value={directory} onChange={e=>setDirectory(e.target.value)} placeholder="Absolute path on the HELIX host (blank = HELIX repo)" className="flex-1 min-w-0 rounded-xl bg-[#080b10] border border-white/15 px-4 py-3 text-sm"/><button onClick={inspect} disabled={loading} className="rounded-xl bg-violet-600 hover:bg-violet-500 px-5 py-3 text-sm disabled:opacity-50">{loading?"Inspectingâ€¦":"Inspect project"}</button></div><p className="text-xs text-gray-500 mt-3">Enter a directory path available to the HELIX server. Browser paths are not exposed to websites. Inspection uses fixed, read-only Git queries.</p></section>
+    {error&&<p role="alert" className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-red-300">{error}</p>}
+    {brief&&<><div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-5">{[[brief.summary.project,"Project"],[brief.summary.branch,"Branch"],[String(brief.summary.changedItems),"Changed items"],[String(brief.summary.recentCommitCount),"Recent commits"]].map(([v,l])=><div key={l} className="rounded-xl border border-white/10 bg-[#10151e] p-4"><p className="text-xs text-gray-500">{l}</p><p className="font-semibold mt-2 break-all">{v}</p></div>)}</div>
+    <div className="grid lg:grid-cols-2 gap-4 mt-4"><section className="panel"><h2 className="section-title">Verified evidence</h2>{brief.verifiedEvidence.map((x,i)=><p key={i} className="row">âœ“ {x}</p>)}</section><section className="panel"><h2 className="section-title">Blockers & assumptions</h2><p className="text-xs uppercase text-red-300">Blockers</p>{brief.blockers.length?brief.blockers.map((x,i)=><p key={i} className="row text-red-200">{x}</p>):<p className="row text-emerald-300">No blockers detected by these checks.</p>}<p className="text-xs uppercase text-amber-300 mt-4">Assumptions</p>{brief.assumptions.length?brief.assumptions.map((x,i)=><p key={i} className="row text-amber-100">{x}</p>):<p className="row">None recorded</p>}</section>
+    <section className="panel"><h2 className="section-title">Git diff & changed paths</h2><pre className="text-xs whitespace-pre-wrap text-gray-300">{brief.diffStat}</pre>{brief.changedFiles.map((x,i)=><p key={i} className="row font-mono break-all">{x}</p>)}</section><section className="panel"><h2 className="section-title">Recent commits</h2>{brief.recentCommits.map((x,i)=><p key={i} className="row font-mono">{x}</p>)}</section>
+    <section className="panel"><h2 className="section-title">README evidence</h2><pre className="max-h-72 overflow-auto whitespace-pre-wrap text-xs text-gray-300">{brief.readme}</pre></section><section className="panel"><h2 className="section-title">Package evidence</h2><pre className="max-h-72 overflow-auto whitespace-pre-wrap text-xs text-gray-300">{JSON.stringify(brief.package,null,2)}</pre></section></div>
+    <section className="mt-4 rounded-2xl border border-violet-500/30 bg-[#10151e] p-5"><p className="text-xs tracking-widest text-violet-300">SWITCH Â· HUMAN / AGENT COLLABORATION</p><h2 className="text-xl font-semibold mt-2">Prepare the handoff</h2><p className="text-sm text-gray-400 mt-2">Review this evidence and share the draft in Switch. HELIX does not claim a live Switch connection. Confirm the task and approval there before any file changes.</p><pre className="mt-4 rounded-xl bg-[#080b10] p-4 text-xs whitespace-pre-wrap text-gray-300">{handoff}</pre><div className="flex flex-wrap items-center gap-3 mt-4"><button onClick={copyHandoff} className="rounded-xl bg-violet-600 px-4 py-2 text-sm">{copied?"Copied handoff":"Copy handoff draft"}</button><label className="flex gap-2 items-center text-sm text-amber-200"><input type="checkbox" checked={approved} onChange={e=>setApproved(e.target.checked)}/> I explicitly approve proposed file modifications</label></div><p className="text-xs text-gray-500 mt-3">{approved?"Approval noted for this session. No modification action is implemented; nothing has been changed.":"No file changes can occur until you explicitly approve them."}</p></section><p className="text-xs text-gray-600 mt-4">{brief.safety} Â· Generated {new Date(brief.generatedAt).toLocaleString()}</p></>}
+  </div></main>;
+}
+
